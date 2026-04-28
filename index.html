@@ -692,15 +692,80 @@
 </footer>
 
 <script>
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach((e, i) => {
-      if (e.isIntersecting) {
-        setTimeout(() => e.target.classList.add('visible'), i * 80);
-      }
-    });
-  }, { threshold: 0.1 });
+  /* 1. PAGE LOAD REVEAL */
+  window.addEventListener('DOMContentLoaded', () => {
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      document.body.classList.add('loaded');
+    }));
+  });
 
-  document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+  /* 2. READING PROGRESS BAR */
+  const bar = document.createElement('div');
+  bar.id = 'progress-bar';
+  document.body.appendChild(bar);
+
+  function updateProgress() {
+    const docH = document.documentElement.scrollHeight - window.innerHeight;
+    bar.style.width = (docH > 0 ? (window.scrollY / docH) * 100 : 0) + '%';
+  }
+
+  /* 3. ACTIVE NAV */
+  const navLinks = document.querySelectorAll('.nav-links a[href^="#"]');
+  const sections = Array.from(navLinks)
+    .map(a => document.querySelector(a.getAttribute('href')))
+    .filter(Boolean);
+
+  function updateNav() {
+    const mid = window.scrollY + window.innerHeight * 0.35;
+    let active = null;
+    sections.forEach(s => { if (s.offsetTop <= mid) active = s; });
+    navLinks.forEach(a => {
+      a.classList.toggle('nav-active', !!(active && a.getAttribute('href') === '#' + active.id));
+    });
+  }
+
+  /* 4. SMOOTH SCROLL WITH NAV OFFSET */
+  navLinks.forEach(a => {
+    a.addEventListener('click', e => {
+      e.preventDefault();
+      const target = document.querySelector(a.getAttribute('href'));
+      if (!target) return;
+      const offset = document.querySelector('nav').offsetHeight + 24;
+      window.scrollTo({ top: target.getBoundingClientRect().top + window.scrollY - offset, behavior: 'smooth' });
+    });
+  });
+
+  /* 5. SCROLL-TRIGGERED REVEAL — uniform stagger per group */
+  const revealObs = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) return;
+      const siblings = Array.from(entry.target.parentElement.children)
+        .filter(el => el.classList.contains('fade-in'));
+      const idx = siblings.indexOf(entry.target);
+      setTimeout(() => entry.target.classList.add('visible'), idx * 60);
+      revealObs.unobserve(entry.target);
+    });
+  }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
+
+  document.querySelectorAll('.fade-in').forEach(el => revealObs.observe(el));
+
+  /* 6. NAV COMPACT ON SCROLL */
+  const nav = document.querySelector('nav');
+  function updateNavSize() { nav.classList.toggle('nav-scrolled', window.scrollY > 60); }
+
+  /* 7. SINGLE RAF SCROLL HANDLER */
+  let ticking = false;
+  window.addEventListener('scroll', () => {
+    if (!ticking) {
+      requestAnimationFrame(() => {
+        updateProgress(); updateNav(); updateNavSize();
+        ticking = false;
+      });
+      ticking = true;
+    }
+  }, { passive: true });
+
+  updateProgress(); updateNav(); updateNavSize();
 </script>
 
 </body>
